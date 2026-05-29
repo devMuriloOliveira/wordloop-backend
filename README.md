@@ -45,7 +45,19 @@ npx prisma generate
 |---------|-----------|
 | `npm run dev` | Servidor com hot-reload (nodemon) — porta **3000** |
 | `npm start` | Servidor em produção |
+| `npm run build` | Aplica migrations em produção (`prisma migrate deploy`) |
 | `npx prisma studio` | Interface visual do banco |
+
+### Deploy (Render / produção)
+
+No painel do serviço, configure:
+
+- **Build Command:** `npm install && npm run build`
+- **Start Command:** `npm start`
+
+O `postinstall` roda `prisma generate` automaticamente. O `npm run build` aplica as migrations no banco (`prisma migrate deploy`).
+
+Sem isso, rotas como `/match-pairs` e campos `correctCount` / `wrongCount` podem falhar em produção.
 
 Após subir, a API responde em `http://localhost:3000`.
 
