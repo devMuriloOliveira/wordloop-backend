@@ -180,15 +180,15 @@ router.get('/dashboard', auth, async (req, res) => {
       }
     })
 
-    const today = new Date()
-
-    today.setHours(0, 0, 0, 0)
-
+    const todayStr = getBrazilDateString()
+    const { start, end } = getBrazilDayRange(todayStr)
+    
     const wordsToday = await prisma.word.count({
       where: {
         userId: req.userId,
         createdAt: {
-          gte: today
+          gte: start,
+          lt: end
         }
       }
     })
@@ -282,6 +282,37 @@ router.put('/me/daily-goal', auth, async (req, res) => {
   }
 })
 
+function getBrazilDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+
+  const year = parts.find(part => part.type === 'year').value
+  const month = parts.find(part => part.type === 'month').value
+  const day = parts.find(part => part.type === 'day').value
+
+  return `${year}-${month}-${day}`
+}
+
+function addDays(dateStr, amount) {
+  const date = new Date(`${dateStr}T12:00:00.000Z`)
+  date.setUTCDate(date.getUTCDate() + amount)
+
+  return date.toISOString().split('T')[0]
+}
+
+function getBrazilDayRange(dateStr) {
+  const nextDateStr = addDays(dateStr, 1)
+
+  return {
+    start: new Date(`${dateStr}T03:00:00.000Z`),
+    end: new Date(`${nextDateStr}T03:00:00.000Z`)
+  }
+}
+
 router.get('/streak', auth, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -293,30 +324,25 @@ router.get('/streak', auth, async (req, res) => {
       }
     })
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
+    const todayStr = getBrazilDateString()
     const days = []
 
     for (let i = 29; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - i)
-
-      const nextDate = new Date(date)
-      nextDate.setDate(date.getDate() + 1)
+      const dateStr = addDays(todayStr, -i)
+      const { start, end } = getBrazilDayRange(dateStr)
 
       const wordsCount = await prisma.word.count({
         where: {
           userId: req.userId,
           createdAt: {
-            gte: date,
-            lt: nextDate
+            gte: start,
+            lt: end
           }
         }
       })
 
       days.push({
-        date: date.toISOString().split('T')[0],
+        date: dateStr,
         wordsCount,
         dailyGoal: user.dailyGoal,
         completed: wordsCount >= user.dailyGoal
