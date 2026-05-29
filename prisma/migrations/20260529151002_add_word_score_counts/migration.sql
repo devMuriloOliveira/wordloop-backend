@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Word" ADD COLUMN     "correctCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "wrongCount" INTEGER NOT NULL DEFAULT 0;

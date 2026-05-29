@@ -5,6 +5,22 @@ const auth = require('../middlewares/auth')
 
 const router = express.Router()
 
+function getDifficultyScore(word) {
+  return word.wrongCount / (word.correctCount + 1)
+}
+
+function selectWordsByDifficulty(words, limit = 10) {
+  const cappedLimit = Math.min(Math.max(Number(limit) || 10, 4), 30)
+
+  return [...words]
+    .sort((a, b) => {
+      const scoreDiff = getDifficultyScore(b) - getDifficultyScore(a)
+      if (scoreDiff !== 0) return scoreDiff
+      return b.wrongCount - a.wrongCount || Math.random() - 0.5
+    })
+    .slice(0, cappedLimit)
+}
+
 router.post('/words', auth, async (req, res) => {
     try {
       const {
@@ -170,11 +186,7 @@ router.post('/words', auth, async (req, res) => {
         })
       }
   
-      const shuffledWords = [...words]
-        .sort(() => Math.random() - 0.5)
-  
-      const selectedWords =
-        shuffledWords.slice(0, 10)
+      const selectedWords = selectWordsByDifficulty(words, req.query.limit)
   
       const quiz = selectedWords.map(word => {
   
@@ -199,6 +211,76 @@ router.post('/words', auth, async (req, res) => {
   
       res.json(quiz)
   
+    } catch (error) {
+      console.log(error)
+  
+      res.status(500).json({
+        error: 'Erro interno'
+      })
+    }
+  })
+
+  router.get('/match-pairs', auth, async (req, res) => {
+    try {
+      const words = await prisma.word.findMany({
+        where: {
+          userId: req.userId
+        }
+      })
+
+      if (words.length < 4) {
+        return res.status(400).json({
+          error: 'Cadastre pelo menos 4 palavras'
+        })
+      }
+
+      const selectedWords = selectWordsByDifficulty(words, req.query.limit)
+
+      res.json(selectedWords)
+    } catch (error) {
+      console.log(error)
+
+      res.status(500).json({
+        error: 'Erro interno'
+      })
+    }
+  })
+
+  router.post('/quiz/answer', auth, async (req, res) => {
+    try {
+      const { wordId, isCorrect } = req.body
+  
+      const id = Number(wordId)
+
+      if (!Number.isInteger(id) || typeof isCorrect !== 'boolean') {
+        return res.status(400).json({
+          error: 'wordId e isCorrect são obrigatórios'
+        })
+      }
+
+      const word = await prisma.word.findFirst({
+        where: {
+          id,
+          userId: req.userId
+        }
+      })
+  
+      if (!word) {
+        return res.status(404).json({
+          error: 'Palavra não encontrada'
+        })
+      }
+  
+      const updatedWord = await prisma.word.update({
+        where: {
+          id
+        },
+        data: isCorrect
+          ? { correctCount: { increment: 1 } }
+          : { wrongCount: { increment: 1 } }
+      })
+  
+      res.json(updatedWord)
     } catch (error) {
       console.log(error)
   
